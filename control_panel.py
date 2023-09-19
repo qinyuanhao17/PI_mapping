@@ -55,6 +55,11 @@ class MyWindow(pi_mapping_ui.Ui_Form, QWidget):
         self.pidevice.ConnectUSB(serialnum='118078756')
         pitools.startup(self.pidevice, stages=self.STAGES,refmodes=self.REFMODE)
         self.pi_info_msg.emit('connected: {}'.format(self.pidevice.qIDN().strip()))
+        position_list = list(self.pidevice.qPOS().values())
+        position_x = position_list[0]
+        position_y = position_list[1]
+        self.x_spbx.setValue(position_x)
+        self.y_spbx.setValue(position_y)
     def pi_info_ui(self):
 
         self.pi_msg.setWordWrap(True)  # 自动换行
@@ -81,19 +86,28 @@ class MyWindow(pi_mapping_ui.Ui_Form, QWidget):
         )
     def pi_signal(self):
         self.x_move_tbtn.clicked.connect(self.x_moveto)
-        self.x_voltage.editingFinished.connect(self.x_moveto)
+        self.x_spbx.editingFinished.connect(self.x_moveto)
         self.y_move_tbtn.clicked.connect(self.y_moveto)
-        self.y_voltage.editingFinished.connect(self.y_moveto)
+        self.y_spbx.editingFinished.connect(self.y_moveto)
+        self.velocity_set_tbtn.clicked.connect(self.set_velocity)
+        self.velocity_spbx.editingFinished.connect(self.set_velocity)
+        #move buttons
         self.y_plus_btn.clicked.connect(self.y_plus)
         self.y_minus_btn.clicked.connect(self.y_minus)
         self.x_plus_btn.clicked.connect(self.x_plus)
         self.x_minus_btn.clicked.connect(self.x_minus)
+        self.pi_stp_btn.clicked.connect(self.stop_all)
+        self.set_ref_tbtn.clicked.connect(self.set_reference)
+        self.home_tbtn.clicked.connect(self.home_to_reference)
+        
+        # mapping signals
         self.mapping_frame_calc_btn.clicked.connect(self.calc_frames)
         self.mapping_start_btn.clicked.connect(self.mapping_thread)
         self.mapping_interrupt_btn.clicked.connect(self.interrupt_mapping)
         self.mapping_return_btn.clicked.connect(self.return_mapping_origin)
 
         self.progress_bar_info.connect(self.progress_bar_thread)
+
     def progress_bar_thread(self,msg):
         self.mapping_progressbar.setValue(int(msg))
     def mapping_thread(self):
@@ -195,40 +209,82 @@ class MyWindow(pi_mapping_ui.Ui_Form, QWidget):
         if (stop_x - start_x) % step_x == 0 and (stop_y -start_y) % step_y == 0:
             frames = ((stop_x - start_x)/step_x + 1) * ((stop_y -start_y)/step_y +1)
             self.frame_spbx.setValue(frames)
+    def set_velocity(self):
+        velocity = float(self.velocity_spbx.value())
+        self.pidevice.VLS(velocity)
+        current_velocity = self.pidevice.qVEL()
+        self.pi_info_msg.emit('current_velocity'+current_velocity)
+    def home_to_reference(self):
+        ref_x = self.float(self.refx_spbx.value())
+        ref_y = self.float(self.refy_spbx.value())
+        self.pidevice.MOV({'1':ref_x, '2':ref_y})
+        pitools.waitontarget(self.pidevice)
+    def set_reference(self):
+        position_list = list(self.pidevice.qPOS().values())
+        position_x = position_list[0]
+        position_y = position_list[1]
+        self.refx_spbx.setValue(position_x)
+        self.refy_spbx.setValue(position_y)
+    def stop_all(self):
+        self.pidevice.STP()
     def y_plus(self):
-        y_position = float(self.y_voltage.value())/20
-        step = float(self.step_voltage_spbx.value())/20
-        target_position = y_position + step
-        self.pi_info_msg.emit('current position '+str(target_position*20))
-        self.y_task.write(target_position)
-        self.y_voltage.setValue(target_position*20)
+        position_list = list(self.pidevice.qPOS().values())
+        
+        position_y = position_list[1]
+        
+        step = float(self.step_spbx.value())
+        target_position = position_y + step
+        self.pi_info_msg.emit('current position '+str(target_position))
+        self.pidevice.MOV({'2':target_position})
+        pitools.waitontarget(self.pidevice)
+        self.y_spbx.setValue(position_y)
     def y_minus(self):
-        y_position = float(self.y_voltage.value())/20
-        step = float(self.step_voltage_spbx.value())/20
-        target_position = y_position - step
-        self.pi_info_msg.emit('current position '+str(target_position*20))
-        self.y_task.write(target_position)
-        self.y_voltage.setValue(target_position*20)
+        position_list = list(self.pidevice.qPOS().values())
+        
+        position_y = position_list[1]
+        
+        step = float(self.step_spbx.value())
+        target_position = position_y - step
+        self.pi_info_msg.emit('current position '+str(target_position))
+        self.pidevice.MOV({'2':target_position})
+        pitools.waitontarget(self.pidevice)
+        self.y_spbx.setValue(position_y)
     def x_plus(self):
-        x_position = float(self.x_voltage.value())/20
-        step = float(self.step_voltage_spbx.value())/20
-        target_position = x_position + step
-        self.pi_info_msg.emit('current position '+str(target_position*20))
-        self.x_task.write(target_position)
-        self.x_voltage.setValue(target_position*20)
+        position_list = list(self.pidevice.qPOS().values())
+        
+        position_x = position_list[0]
+        
+        step = float(self.step_spbx.value())
+        target_position = position_x + step
+        self.pi_info_msg.emit('current position '+str(target_position))
+        self.pidevice.MOV({'1':target_position})
+        pitools.waitontarget(self.pidevice)
+        self.x_spbx.setValue(position_x)
     def x_minus(self):
-        x_position = float(self.x_voltage.value())/20
-        step = float(self.step_voltage_spbx.value())/20
-        target_position = x_position - step
-        self.pi_info_msg.emit('current position '+str(target_position*20))
-        self.x_task.write(target_position)
-        self.x_voltage.setValue(target_position*20)
+        position_list = list(self.pidevice.qPOS().values())
+        
+        position_x = position_list[0]
+        
+        step = float(self.step_spbx.value())
+        target_position = position_x - step
+        self.pi_info_msg.emit('current position '+str(target_position))
+        self.pidevice.MOV({'1':target_position})
+        pitools.waitontarget(self.pidevice)
+        self.x_spbx.setValue(position_x)
     def x_moveto(self):
-        x_pos = float(self.x_voltage.value())/20
-        self.x_task.write(x_pos)
+        x_pos = float(self.x_spbx.value())
+        self.pidevice.MOV({'1':x_pos})
+        pitools.waitontarget(self.pidevice)
+        position_list = list(self.pidevice.qPOS().values())
+        position_x = position_list[0]
+        self.x_spbx.setValue(position_x)
     def y_moveto(self):
-        y_pos = float(self.y_voltage.value())/20
-        self.y_task.write(y_pos)
+        y_pos = float(self.y_spbx.value())
+        self.pidevice.MOV({'2':y_pos})
+        pitools.waitontarget(self.pidevice)
+        position_list = list(self.pidevice.qPOS().values())
+        position_y = position_list[1]
+        self.y_spbx.setValue(position_y)
     '''Set window ui'''
     def window_btn_signal(self):
         # window button sigmal
